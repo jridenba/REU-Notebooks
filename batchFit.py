@@ -1,3 +1,8 @@
+# Fitting in 10 batches: 0 - 564558, 564559 - 1129117, 1129118 - 1693676, 1693677 - 2258235, 2258236 - 2822794, 
+# 2822795 - 3387353, 3387354 - 3951912, 3951913 - 4516471, 4516472 - 5081030, 5081031 - 5645589
+
+
+
 from sedfitter.fit import Fitter
 from sedfitter.extinction import Extinction
 from sedfitter.source import Source
@@ -6,6 +11,8 @@ import pandas as pd
 import astropy.units as u
 import argparse
 from itertools import islice
+
+print("Starting batchFit.py at time: " + str(pd.Timestamp.now()))
 
 parser = argparse.ArgumentParser()
 parser.add_argument('startindex', type=int, help='Index of the first source to be fit')
@@ -22,41 +29,52 @@ filterpeaks = [1.235, 1.662, 2.159, 3.6, 4.5, 5.8, 8.0, 23.675]
 
 sourcepath = '../data/raw/SESNA_normalized' # Want to split this source path into a specified chunk of sources
 sourcefile = open(sourcepath,'r')
-savables = pd.DataFrame(columns = ['ID', 'Model', 'Model Fluxes', 'Source Flux', 'Valid', 'Chi^2', 'Chi^2 DOF', 'Av', 'Scale'])
+
+rowlist = []
 
 numfits = endindex - startindex + 1 # Think 0 to 10 is 11 fits if we include both 0 and 10
 index = startindex
+
+sourcecatalog = pd.read_pickle('../data/raw/SESNA_INPUTS_SourceID-Catalog_JakeJuly18.pkl')
+sourcecatalog = sourcecatalog.iloc[startindex:endindex+1]
+sourcecatalog.set_index('ID',inplace=True)
 
 for line in islice(sourcefile,startindex,endindex+1): # This for loop will run through each Source in specified range of SESNA
     try: s = Source.from_ascii(line)
     except EOFError: break
 
+    distances = sourcecatalog.loc[s.name][['DistMin','DistMax']].values
+
     fitter = Fitter(filters, apertures, '../data/galaxtemps',
             extinction_law=extinction,
-            distance_range=[0.8, 2] * u.kpc,
+            distance_range=distances * u.kpc,
             av_range=[0, 100.], remove_resolved=True)
     
     info = fitter.fit(s)
-    if ((index-startindex) % 5) == 0:
-        print("Fitting source at index: %3.0f " % index)
+    info.keep(('N',10))
+    if ((index-startindex) % 100) == 0:
+        print("Fitting source at index: %10.0f at time %10.0f" % index,pd.Timestamp.now())
     # Data to be saved (modelfluxes, chi2, chi2 deg of freedom,)
     modelflux = info.model_fluxes
     chi2 = info.chi2
     chi2_DOF = len([x for x in s.valid if x == 1])
     sourcename = info.source.name
     source = np.array(info.source.to_ascii().split()[11:-1:2]).astype(float) # Make sure this is pulling the correct values. We take 11 to the last value because first 3 indices are ID and ra/dec, followed by 8 valid numbers
-    #sourceerror = np.array(info.source.to_ascii().split()[12::2]).astype(float) # This grabs error
     mask = np.array([True if x == 1 else False for x in info.source.valid])
     fitav = info.av
     fitsc = info.sc
     modelname = info.model_name
-    savables.loc[len(savables.index)] = [sourcename, modelname, modelflux, source, mask, chi2, chi2_DOF, fitav, fitsc]
 
-    if index < endindex: # We check exclusively equal to because we check after the fit happens, so the last fit when index = endindex has already happened
+    row = pd.DataFrame(columns = ['ID', 'Model', 'Model Fluxes', 'Source Flux', 'Valid', 'Chi^2', 'Chi^2 DOF', 'Av', 'Scale'])
+    row.loc[len(row.index)] = [sourcename, modelname, modelflux, source, mask, chi2, chi2_DOF, fitav, fitsc]
+    rowlist.append(row)
+
+    if index < endindex: # We check exclusively less than because we check after the fit happens, so the last fit when index = endindex has already happened
         index += 1
     else:
         break
 
+savables = pd.concat(rowlist,ignore_index=True)
 savables.to_csv('../data/processed/SESNAFITS_'+str(args.startindex)+'_to_'+str(args.endindex)+'.csv')
 
 
