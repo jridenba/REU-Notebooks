@@ -45,7 +45,7 @@ for line in islice(sourcefile,startindex,endindex+1): # This for loop will run t
 
     distances = sourcecatalog.loc[s.name][['DistMin','DistMax']].values
 
-    fitter = Fitter(filters, apertures, '../data/galaxtemps',
+    fitter = Fitter(filters, apertures, '../data/galaxtemps2', # Double check this line, right now it's set to 2nd set
             extinction_law=extinction,
             distance_range=distances * u.kpc,
             av_range=[0, 100.], remove_resolved=True)
@@ -53,7 +53,8 @@ for line in islice(sourcefile,startindex,endindex+1): # This for loop will run t
     info = fitter.fit(s)
     info.keep(('N',10))
     if ((index-startindex) % 100) == 0:
-        print("Fitting source at index: %10.0f at time %10.0f" % index,pd.Timestamp.now())
+        time = pd.Timestamp.now()
+        print(f"Fitting source at index:{index:10.0f} at time: {time}")
     # Data to be saved (modelfluxes, chi2, chi2 deg of freedom,)
     modelflux = info.model_fluxes
     chi2 = info.chi2
@@ -75,7 +76,7 @@ for line in islice(sourcefile,startindex,endindex+1): # This for loop will run t
         break
 
 savables = pd.concat(rowlist,ignore_index=True)
-savables.to_csv('../data/processed/SESNAFITS_'+str(args.startindex)+'_to_'+str(args.endindex)+'.csv')
+savables.to_csv('../data/processed/Second_Models(Fnu)/SESNAFITS2_'+str(args.startindex)+'_to_'+str(args.endindex)+'.csv')
 
 
 sourcefile.close()
