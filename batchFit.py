@@ -76,7 +76,7 @@ for line in islice(sourcefile,startindex,endindex+1): # This for loop will run t
         break
 
 savables = pd.concat(rowlist,ignore_index=True)
-savables.to_csv('../data/processed/Second_Models(Fnu)/SESNAFITS2_'+str(args.startindex)+'_to_'+str(args.endindex)+'.csv')
+savables.to_pickle('../data/processed/Second_Models_Fnu/SESNAFITS2_'+str(args.startindex)+'_to_'+str(args.endindex)+'.pkl')
 
 
 sourcefile.close()
